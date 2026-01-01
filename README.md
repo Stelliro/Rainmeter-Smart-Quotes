@@ -2,9 +2,9 @@
 
 A highly advanced, interactive Rainmeter skin for displaying, managing, and curating inspirational quotes.
 
-This project is a heavily modified and expanded version of the original [**Static Quotes**](https://github.com/alestrunda/static-quotes) by **alestrunda**. It builds upon the original concept with a robust favorites management system, custom inputs, and dynamic UI scaling.
+This project is a heavily modified and expanded version of the original [**Static Quotes**](https://github.com/alestrunda/static-quotes) by [**alestrunda**](https://github.com/alestrunda). It builds upon the original concept with a robust favorites management system, custom inputs, and dynamic UI scaling.
 
-[**Version**](https://img.shields.io/badge/version-1.0-blue) [**Rainmeter**](https://img.shields.io/badge/Rainmeter-Skin-green) [**License**](https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey)
+![Version](https://img.shields.io/badge/version-1.0-blue) ![Rainmeter](https://img.shields.io/badge/Rainmeter-Skin-green) ![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey)
 
 ## 📸 Gallery
 
@@ -20,7 +20,7 @@ This project is a heavily modified and expanded version of the original [**Stati
   <img src="Screenshots/Settings.png" width="45%" alt="Settings Menu">
 </p>
 <p align="center">
-  <b>Left:</b> The clean main display. <b>Right:</b> The Settings \\\\\\\& Favorites Manager.
+  <b>Left:</b> The clean main display. <b>Right:</b> The Settings \\\& Favorites Manager.
 </p>
 
 ## ✨ Features
@@ -54,7 +54,7 @@ This project is a heavily modified and expanded version of the original [**Stati
 
 1. Ensure you have [Rainmeter](https://www.rainmeter.net/) installed.
 2. Download this repository.
-3. Place the folder into your Rainmeter Skins directory (usually `Documents\\\\\\\\Rainmeter\\\\\\\\Skins\\\\\\\\`).
+3. Place the folder into your Rainmeter Skins directory (usually `Documents\\\\Rainmeter\\\\Skins\\\\`).
 4. Open Rainmeter and load `StaticQuote.ini`.
 
 ## 🎮 How to Use
