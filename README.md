@@ -4,7 +4,7 @@ A highly advanced, interactive Rainmeter skin for displaying, managing, and cura
 
 This project is a heavily modified and expanded version of the original [**Static Quotes**](https://github.com/alestrunda/static-quotes) by [**alestrunda**](https://github.com/alestrunda). It builds upon the original concept with a robust favorites management system, custom inputs, and dynamic UI scaling.
 
-![Version](https://img.shields.io/badge/version-1.0-blue) ![Rainmeter](https://img.shields.io/badge/Rainmeter-Skin-green) ![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey)
+<img src="https://img.shields.io/badge/version-1.0-blue" alt="Version"> <img src="https://img.shields.io/badge/Rainmeter-Skin-green" alt="Rainmeter"> <img src="https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey" alt="License">
 
 ## 📸 Gallery
 
