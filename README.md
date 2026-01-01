@@ -9,7 +9,7 @@ This project is a heavily modified and expanded version of the original [**Stati
 ## 📸 Gallery
 
 <p align="center">
-  <img src="Screenshots/Screenshot.jpg" width="100%" alt="Full Desktop Context">
+  <img src="Screenshots/Screenshot.png" width="100%" alt="Full Desktop Context">
 </p>
 <p align="center">
   <b>Above:</b> The Quote Manager seamlessly integrated into a desktop environment.
