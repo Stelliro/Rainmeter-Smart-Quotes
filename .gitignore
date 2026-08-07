@@ -1,0 +1,10 @@
+# Local / agent scratch
+SEARCH_AND_DESTROY_*.md
+StaticQuote_committed.ini
+*.bak
+.DS_Store
+Thumbs.db
+
+# Editor / Rainmeter temp
+*.tmp
+~*
