@@ -8,3 +8,6 @@ Thumbs.db
 # Editor / Rainmeter temp
 *.tmp
 ~*
+
+*.zip
+
