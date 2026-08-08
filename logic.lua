@@ -1,30 +1,43 @@
--- logic.lua (Version 1.1.0 — release polish)
+-- logic.lua (Version 1.2.1 — batch cache, author split fix, rate limit)
+--
+-- Free ZenQuotes limit: 5 requests / 30 seconds / IP
+-- Docs recommend /api/quotes batch + local cache, not /api/random every time.
+-- We fetch a batch rarely, rotate quotes from memory/disk, and never blank the UI.
 
 function Initialize()
-    math.randomseed(os.time())
-
-    SKIN:Bang('!SetOption', 'MeterAuthor', 'Text', 'Ready')
-    SKIN:Bang('!UpdateMeter', 'MeterAuthor')
-    SKIN:Bang('!Redraw')
+    math.randomseed(os.time() + (math.floor(os.clock() * 1000) % 100000))
 
     filePath = SKIN:GetVariable('CURRENTPATH') .. "Favorites.txt"
+    cachePath = SKIN:GetVariable('CURRENTPATH') .. "QuotesCache.txt"
+    debugPath = SKIN:GetVariable('CURRENTPATH') .. "debug.log"
+
     favTable = {}
+    quoteCache = {}
     currentQ = "Loading..."
-    currentA = ""
+    currentA = "Starting..."
+    lastShownKey = ""
     scrollIndex = 1
     slots = 5
     updateCounter = 0
     menuOpen = false
+    webInFlight = false
+    lastApiCall = 0
+    cacheFetchedAt = 0
 
-    local file = io.open(filePath, "r")
-    if not file then
-        file = io.open(filePath, "w")
-        if file then file:close() end
-    else
-        file:close()
-    end
-
+    EnsureFile(filePath)
     LoadFavorites()
+    LoadQuoteCache()
+
+    DebugLog("Initialize: favorites=" .. tostring(#favTable)
+        .. " cache=" .. tostring(#quoteCache)
+        .. " DebugMode=" .. tostring(SKIN:GetVariable('DebugMode')))
+
+    -- Always show something local first — never sit on "Fetching..."
+    if not ShowNextQuote(false) then
+        currentQ = "No quotes yet"
+        currentA = "Add favorites or wait for cache"
+        UpdateDisplay()
+    end
 
     local savedState = SKIN:GetVariable('MenuState')
     if savedState == '1' then
@@ -37,11 +50,64 @@ function Initialize()
     end
 end
 
+-- --- CONFIG HELPERS ---
+
+function MinApiInterval()
+    -- Stay under free tier 5 / 30s (avg 6s). Default 10s = max ~3 / 30s.
+    local v = tonumber(SKIN:GetVariable('MinApiInterval'))
+    if not v or v < 8 then v = 10 end
+    if v > 120 then v = 120 end
+    return v
+end
+
+function CacheTtl()
+    -- How long a batch is "fresh" before a background re-fetch is allowed.
+    -- Default 45 minutes — plenty of local rotation without hammering the API.
+    local v = tonumber(SKIN:GetVariable('CacheTtl'))
+    if not v or v < 300 then v = 2700 end
+    if v > 86400 then v = 86400 end
+    return v
+end
+
+function BatchUrl()
+    local url = SKIN:GetVariable('URL') or 'https://zenquotes.io/api/quotes'
+    -- Normalize legacy /random installs to the recommended batch endpoint
+    if url:find('/api/random', 1, true) then
+        url = url:gsub('/api/random', '/api/quotes')
+    end
+    return url
+end
+
 -- --- UTILITIES ---
+
+function EnsureFile(path)
+    local file = io.open(path, "r")
+    if not file then
+        file = io.open(path, "w")
+        if file then file:close() end
+    else
+        file:close()
+    end
+end
+
+function DebugEnabled()
+    return tostring(SKIN:GetVariable('DebugMode') or '0') == '1'
+end
+
+function DebugLog(msg)
+    local line = os.date("%Y-%m-%d %H:%M:%S") .. " | " .. tostring(msg) .. "\n"
+    local f = io.open(debugPath, "a")
+    if f then
+        f:write(line)
+        f:close()
+    end
+    if DebugEnabled() then
+        SKIN:Bang('!Log', 'SmartQuotes: ' .. tostring(msg), 'Notice')
+    end
+end
 
 function CleanString(str)
     if not str then return "" end
-    -- Strip UTF-8 BOM if present
     if string.byte(str, 1) == 239 and string.byte(str, 2) == 187 and string.byte(str, 3) == 191 then
         str = string.sub(str, 4)
     end
@@ -56,25 +122,204 @@ function CleanText(s)
     s = s:gsub("&ldquo;", "'")
     s = s:gsub("&rdquo;", "'")
     s = s:gsub("&mdash;", "-")
+    s = s:gsub('\\/', '/')
     s = s:gsub('\\"', "'")
+    s = s:gsub("\\n", " ")
     s = s:gsub("\n", " ")
     s = s:gsub("\r", " ")
     return s
 end
 
--- Split "quote" - author on the last " - " separator
 function SplitQuoteAuthor(raw)
+    -- Split on the LAST plain " - " separator (quotes may contain hyphens).
+    -- Avoid reverse-index math — it was off-by-one and ate the first author letter
+    -- ("Stelliro" → "telliro") and left a trailing quote on the quote text.
     raw = CleanString(raw or "")
-    local reversed = string.reverse(raw)
-    local s, e = string.find(reversed, " - ")
-    if not s then
-        return raw, "Unknown"
+    local sep = " - "
+    local idx = nil
+    local from = 1
+    while true do
+        local s = string.find(raw, sep, from, true)
+        if not s then break end
+        idx = s
+        from = s + 1
     end
-    local splitPoint = string.len(raw) - e + 1
-    local q = string.sub(raw, 1, splitPoint - 1)
-    local a = string.sub(raw, splitPoint + 3)
-    q = q:gsub('^%s*"+', ''):gsub('"+%s*$', '')
+    if not idx then
+        local qOnly = raw:gsub('^[%s"“”]+', ''):gsub('[%s"“”]+$', '')
+        return qOnly, "Unknown"
+    end
+    local q = string.sub(raw, 1, idx - 1)
+    local a = string.sub(raw, idx + #sep)
+    q = q:gsub('^[%s"“”]+', ''):gsub('[%s"“”]+$', '')
+    a = a:gsub('^[%s"“”]+', ''):gsub('[%s"“”]+$', '')
     return q, a
+end
+
+function QuoteKey(q, a)
+    return tostring(q) .. "\0" .. tostring(a)
+end
+
+function IsPlaceholderQuote()
+    if not currentQ or currentQ == "" then return true end
+    if currentQ == "Loading..." or currentQ == "Parsing..." then return true end
+    if currentQ == "Parse Error" or currentQ == "Network Error" then return true end
+    if currentQ == "No quotes yet" or currentQ == "Offline" then return true end
+    return false
+end
+
+function FormatLine(q, a)
+    return '"' .. q .. '" - ' .. a
+end
+
+-- --- CACHE I/O ---
+
+function LoadQuoteCache()
+    quoteCache = {}
+    cacheFetchedAt = tonumber(SKIN:GetVariable('CacheFetchedAt')) or 0
+    local file = io.open(cachePath, "r")
+    if not file then
+        DebugLog("LoadQuoteCache: no file yet")
+        return
+    end
+    for line in file:lines() do
+        if line and line ~= "" then
+            local q, a = SplitQuoteAuthor(line)
+            if q and q ~= "" and a and a ~= "" and a ~= "Unknown" then
+                table.insert(quoteCache, {q = q, a = a})
+            end
+        end
+    end
+    file:close()
+    -- Disk cache without a timestamp is still usable; treat as slightly stale so a quiet refresh can run later
+    if #quoteCache > 0 and cacheFetchedAt <= 0 then
+        cacheFetchedAt = os.time() - math.floor(CacheTtl() * 0.75)
+    end
+    DebugLog("LoadQuoteCache: loaded " .. tostring(#quoteCache)
+        .. " age=" .. tostring(os.time() - (cacheFetchedAt or 0)) .. "s")
+end
+
+function SaveQuoteCache()
+    local file = io.open(cachePath, "w")
+    if not file then return end
+    for _, item in ipairs(quoteCache) do
+        file:write(FormatLine(item.q, item.a) .. "\n")
+    end
+    file:close()
+    SKIN:Bang('!WriteKeyValue', 'Variables', 'CacheFetchedAt', tostring(cacheFetchedAt))
+end
+
+function CacheIsFresh()
+    if #quoteCache < 1 then return false end
+    if cacheFetchedAt <= 0 then return false end
+    return (os.time() - cacheFetchedAt) < CacheTtl()
+end
+
+function CanCallApi()
+    ClearStaleFlight()
+    if webInFlight then
+        DebugLog("CanCallApi: blocked (in flight)")
+        return false
+    end
+    local elapsed = os.time() - (lastApiCall or 0)
+    local need = MinApiInterval()
+    if lastApiCall > 0 and elapsed < need then
+        DebugLog("CanCallApi: rate wait " .. tostring(need - elapsed) .. "s left (min " .. tostring(need) .. "s)")
+        return false
+    end
+    return true
+end
+
+function ClearStaleFlight()
+    -- WebParser can hang with no callback; don't block the rate gate forever
+    if webInFlight and lastApiCall > 0 and (os.time() - lastApiCall) >= 20 then
+        webInFlight = false
+        DebugLog("ClearStaleFlight: cleared hung request after 20s")
+    end
+end
+
+-- --- DISPLAY PICKERS ---
+
+function ShowRandomFavorite(resetCounter)
+    if #favTable < 1 then return false end
+    -- Prefer a different favorite than what's on screen
+    local pick = favTable[math.random(1, #favTable)]
+    if #favTable > 1 then
+        for _ = 1, 8 do
+            local q, a = SplitQuoteAuthor(pick)
+            if QuoteKey(q, a) ~= lastShownKey then break end
+            pick = favTable[math.random(1, #favTable)]
+        end
+    end
+    local q, a = SplitQuoteAuthor(pick)
+    if not q or q == "" then return false end
+    currentQ = q
+    currentA = a
+    lastShownKey = QuoteKey(q, a)
+    UpdateDisplay()
+    if resetCounter then updateCounter = 0 end
+    DebugLog("ShowRandomFavorite: " .. string.sub(q, 1, 50))
+    return true
+end
+
+function ShowRandomCached()
+    if #quoteCache < 1 then return false end
+    local item = quoteCache[math.random(1, #quoteCache)]
+    if #quoteCache > 1 then
+        for _ = 1, 12 do
+            if QuoteKey(item.q, item.a) ~= lastShownKey then break end
+            item = quoteCache[math.random(1, #quoteCache)]
+        end
+    end
+    if not item or not item.q or item.q == "" then return false end
+    currentQ = item.q
+    currentA = item.a
+    lastShownKey = QuoteKey(item.q, item.a)
+    UpdateDisplay()
+    DebugLog("ShowRandomCached: pool=" .. tostring(#quoteCache) .. " | " .. string.sub(item.q, 1, 50))
+    return true
+end
+
+-- Rotate using local data only. Optionally request a quiet background refresh.
+function ShowNextQuote(allowBackgroundFetch)
+    local freq = tonumber(SKIN:GetVariable('RecycleFrequency')) or 0
+    local showed = false
+
+    -- Prefer the online cache when it has quotes. Favorites only on the recycle cadence
+    -- (or when the cache is empty). Old path fell through to favorites every click when
+    -- cache=0, which looked like "only favorites work".
+    local useFavorite = (#favTable > 0 and freq > 0 and (freq == 1 or updateCounter >= freq))
+
+    if useFavorite then
+        showed = ShowRandomFavorite(true)
+    end
+
+    if not showed then
+        showed = ShowRandomCached()
+    end
+
+    if not showed then
+        showed = ShowRandomFavorite(false)
+    end
+
+    if allowBackgroundFetch then
+        -- Refresh when empty/stale; force attempt if we still have no cache
+        MaybeRefreshCache(#quoteCache < 1)
+    end
+
+    return showed
+end
+
+function MaybeRefreshCache(force)
+    ClearStaleFlight()
+    -- force=true only when we have nothing useful locally
+    if not force and CacheIsFresh() then
+        return
+    end
+    if #quoteCache > 0 and CacheIsFresh() then
+        return
+    end
+    local reason = force and "empty-or-forced" or "stale-or-empty"
+    RequestBatch(reason)
 end
 
 -- --- MENU / PANELS ---
@@ -123,35 +368,94 @@ function AddManualQuote(q, a)
     if not q or not a or q == "" or a == "" then return end
     q = CleanText(q)
     a = CleanText(a)
-    local fullString = '"' .. q .. '"' .. " - " .. a
+    local fullString = FormatLine(q, a)
     table.insert(favTable, 1, fullString)
     SaveFavorites()
     menuOpen = true
     CancelAdd()
 end
 
-function OnWebUpdate()
-    SKIN:Bang('!SetOption', 'MeterQuote', 'Text', 'Parsing...')
-    SKIN:Bang('!Redraw')
+function ParseAllQuotes(rawData)
+    local results = {}
+    if not rawData or rawData == "" then
+        return results, "empty response"
+    end
 
+    rawData = CleanString(rawData)
+    rawData = rawData:gsub("\n", " "):gsub("\r", " ")
+
+    -- Rate-limit / error pages often aren't JSON quote arrays
+    local lower = string.lower(rawData)
+    if lower:find('too many requests', 1, true)
+        or lower:find('rate limit', 1, true)
+        or lower:find('"error"', 1, true) then
+        return results, "rate limited or error body: " .. string.sub(rawData, 1, 160)
+    end
+
+    for q, a in rawData:gmatch('"q"%s*:%s*"(.-)"%s*,%s*"a"%s*:%s*"(.-)"') do
+        q = CleanText(q)
+        a = CleanText(a)
+        if q ~= "" and a ~= "" then
+            table.insert(results, {q = q, a = a})
+        end
+    end
+
+    if #results < 1 then
+        return results, "no quotes parsed: " .. string.sub(rawData, 1, 160)
+    end
+    return results, nil
+end
+
+function OnWebUpdate()
+    webInFlight = false
     local measure = SKIN:GetMeasure('MeasureSite')
-    if not measure then return end
+    if not measure then
+        DebugLog("OnWebUpdate: MeasureSite missing")
+        OnWebError("nomeasure")
+        return
+    end
 
     local rawData = measure:GetStringValue() or ""
-    rawData = string.gsub(rawData, "\n", " ")
-    rawData = string.gsub(rawData, "\r", " ")
+    DebugLog("OnWebUpdate: bytes=" .. tostring(#rawData)
+        .. " num=" .. tostring(measure:GetValue())
+        .. " preview=" .. string.sub(rawData, 1, 100))
 
-    local q = rawData:match('"q"%s*:%s*"(.-)"')
-    local a = rawData:match('"a"%s*:%s*"(.-)"')
+    local batch, err = ParseAllQuotes(rawData)
+    if batch and #batch > 0 then
+        quoteCache = batch
+        cacheFetchedAt = os.time()
+        SaveQuoteCache()
+        DebugLog("OnWebUpdate: cached " .. tostring(#batch) .. " quotes")
 
-    if q and a then
-        currentQ = CleanText(q)
-        currentA = CleanText(a)
-        UpdateDisplay()
-    else
-        currentQ = "Parse Error"
-        currentA = "Retrying..."
-        UpdateDisplay()
+        -- If UI was still a placeholder, show one now; otherwise leave current quote
+        if IsPlaceholderQuote() then
+            ShowRandomCached()
+        end
+        return
+    end
+
+    DebugLog("OnWebUpdate: parse failed — " .. tostring(err))
+    -- Keep whatever is already on screen
+    if IsPlaceholderQuote() then
+        if not ShowRandomCached() and not ShowRandomFavorite(false) then
+            currentQ = "Parse Error"
+            currentA = "See debug.log"
+            UpdateDisplay()
+        end
+    end
+end
+
+function OnWebError(kind)
+    webInFlight = false
+    kind = kind or "unknown"
+    DebugLog("OnWebError: " .. tostring(kind))
+
+    if IsPlaceholderQuote() then
+        if not ShowRandomCached() and not ShowRandomFavorite(false) then
+            currentQ = "Network Error"
+            currentA = tostring(kind) .. " — see debug.log"
+            UpdateDisplay()
+        end
     end
 end
 
@@ -164,11 +468,48 @@ function UpdateDisplay()
     SKIN:Bang('!Redraw')
 end
 
-function ManualRefresh()
-    -- Reset countdown via formula only (Calc has no ExecuteBatch)
+function ResetTimer()
     SKIN:Bang('!SetOption', 'MeasureTimer', 'Formula', '0')
     SKIN:Bang('!UpdateMeasure', 'MeasureTimer')
-    GetQuote()
+    SKIN:Bang('!SetOption', 'MeasureTimer', 'Formula', '(MeasureTimer % #CurrentTimer#) + 1')
+end
+
+function RequestBatch(reason)
+    if not CanCallApi() then
+        DebugLog("RequestBatch skipped (" .. tostring(reason) .. ")")
+        return false
+    end
+
+    -- Use the configured batch URL as-is (no query cache-bust).
+    -- Changing URL + ForceReload every call was hanging WebParser with no FinishAction.
+    local url = BatchUrl()
+    url = url:match('^([^%?]+)') or url
+
+    webInFlight = true
+    lastApiCall = os.time()
+    DebugLog("RequestBatch (" .. tostring(reason) .. "): " .. url
+        .. " interval=" .. tostring(MinApiInterval())
+        .. "s ttl=" .. tostring(CacheTtl()) .. "s"
+        .. " pool=" .. tostring(#quoteCache))
+
+    SKIN:Bang('!SetOption', 'MeasureSite', 'URL', url)
+    SKIN:Bang('!CommandMeasure', 'MeasureSite', 'Update')
+    return true
+end
+
+-- Double-click: instant local rotation; never wipe UI waiting on network
+function ManualRefresh()
+    ResetTimer()
+    updateCounter = updateCounter + 1
+    DebugLog("ManualRefresh (double-click) cache=" .. tostring(#quoteCache)
+        .. " favs=" .. tostring(#favTable))
+
+    if not ShowNextQuote(true) then
+        -- Nothing local yet — one careful batch; keep a calm status line
+        currentA = "Updating library..."
+        UpdateDisplay()
+        RequestBatch("manual-empty")
+    end
 end
 
 function LoadFavorites()
@@ -195,8 +536,8 @@ function SaveFavorites()
 end
 
 function ToggleFavorite()
-    if currentQ == "Loading..." or currentQ == "Parsing..." or currentQ == "Parse Error" then return end
-    local full = '"' .. currentQ .. '" - ' .. currentA
+    if IsPlaceholderQuote() then return end
+    local full = FormatLine(currentQ, currentA)
     local found = false
     for i, v in ipairs(favTable) do
         if string.find(v, currentQ, 1, true) then
@@ -212,13 +553,14 @@ end
 
 function CheckIfFavorite()
     local isFav = false
-    for _, v in ipairs(favTable) do
-        if string.find(v, currentQ, 1, true) then
-            isFav = true
-            break
+    if not IsPlaceholderQuote() then
+        for _, v in ipairs(favTable) do
+            if string.find(v, currentQ, 1, true) then
+                isFav = true
+                break
+            end
         end
     end
-    -- MeterHeart is a String meter — use FontColor, not ImageTint
     if isFav then
         SKIN:Bang('!SetOption', 'MeterHeart', 'FontColor', '255,100,100,255')
         SKIN:Bang('!ShowMeter', 'MeterFavoriteStar')
@@ -292,6 +634,7 @@ end
 function SetTimerInput(mins)
     local m = tonumber(mins)
     if not m or m < 1 then m = 1 end
+    -- Floor at 1 minute so the timer never thrash-requests the network path
     if m > 1440 then m = 1440 end
     local seconds = math.floor(m * 60)
     SKIN:Bang('!SetVariable', 'CurrentTimer', seconds)
@@ -317,24 +660,15 @@ function AdjustScale(delta)
     SKIN:Bang('!Refresh')
 end
 
+-- Timer / startup: local rotation + optional quiet batch refresh
 function GetQuote()
-    SKIN:Bang('!SetOption', 'MeasureTimer', 'Formula', '0')
-    local freq = tonumber(SKIN:GetVariable('RecycleFrequency')) or 0
+    ResetTimer()
     updateCounter = updateCounter + 1
+    DebugLog("GetQuote: counter=" .. tostring(updateCounter)
+        .. " cache=" .. tostring(#quoteCache)
+        .. " fresh=" .. tostring(CacheIsFresh()))
 
-    if #favTable > 0 and freq > 0 and (freq == 1 or updateCounter >= freq) then
-        local randomFav = favTable[math.random(1, #favTable)]
-        local q, a = SplitQuoteAuthor(randomFav)
-        if q and q ~= "" then
-            currentQ = q
-            currentA = a
-            UpdateDisplay()
-            updateCounter = 0
-        else
-            SKIN:Bang('!CommandMeasure', 'MeasureSite', 'Update')
-        end
-    else
-        SKIN:Bang('!CommandMeasure', 'MeasureSite', 'Update')
+    if not ShowNextQuote(true) then
+        RequestBatch("getquote-empty")
     end
-    SKIN:Bang('!SetOption', 'MeasureTimer', 'Formula', '(MeasureTimer % #CurrentTimer#) + 1')
 end

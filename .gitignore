@@ -8,6 +8,9 @@ Thumbs.db
 # Editor / Rainmeter temp
 *.tmp
 ~*
-
 *.zip
+
+# Runtime diagnostics (written by logic.lua when DebugMode=1)
+debug.log
+# QuotesCache.txt is shipped as a seed pool and may be refreshed locally
 
