@@ -1,163 +1,141 @@
 # Smart Quotes
 
-**Interactive quote manager for Rainmeter** — rotate inspiration from a local ZenQuotes cache, save favorites, and curate your own library without leaving the desktop.
+**A quote widget for your Windows desktop.** Smart Quotes shows a new inspirational quote every few minutes, lets you save the ones you like, and lets you add your own — all without leaving the desktop.
 
-Built as a heavily expanded successor to [Static Quotes](https://github.com/alestrunda/static-quotes) by [alestrunda](https://github.com/alestrunda).
+It runs on [Rainmeter](https://www.rainmeter.net/), a free desktop customisation tool for Windows. Built as a heavily expanded successor to [Static Quotes](https://github.com/alestrunda/static-quotes) by [alestrunda](https://github.com/alestrunda).
 
-<img src="https://img.shields.io/badge/version-1.2.1-blue" alt="Version"> <img src="https://img.shields.io/badge/Rainmeter-4.5%2B-green" alt="Rainmeter"> <img src="https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey" alt="License"> <img src="https://img.shields.io/badge/platform-Windows-0078D6" alt="Windows"> <img src="https://img.shields.io/badge/API-ZenQuotes-informational" alt="ZenQuotes">
-
-## Gallery
+<img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version"> <img src="https://img.shields.io/badge/Rainmeter-4.5%2B-green" alt="Rainmeter"> <img src="https://img.shields.io/badge/license-CC%20BY--NC--SA%203.0-lightgrey" alt="License"> <img src="https://img.shields.io/badge/platform-Windows-0078D6" alt="Windows"> <img src="https://img.shields.io/badge/API-ZenQuotes-informational" alt="ZenQuotes">
 
 <p align="center">
   <img src="Screenshots/Screenshot.png" width="100%" alt="Smart Quotes on the desktop">
 </p>
-<p align="center"><b>Desktop context</b> — the widget blends into a full Rainmeter setup.</p>
 
-<p align="center">
-  <img src="Screenshots/Quote.png" width="45%" alt="Main quote display">
-  <img src="Screenshots/Settings.png" width="45%" alt="Settings and favorites library">
-</p>
-<p align="center"><b>Left:</b> main quote display &nbsp;·&nbsp; <b>Right:</b> settings &amp; favorites library</p>
+## Install
 
-## Features
+### 1. Get Rainmeter (skip if you already have it)
 
-### Smart quote engine (rate-limit safe)
-- Uses the [ZenQuotes](https://zenquotes.io/) **batch** endpoint (`/api/quotes`, ~50 quotes) instead of `/api/random` on every change
-- Free tier is **5 requests / 30 seconds / IP** — double-click and the timer rotate **from local cache**, not the network
-- Ships with a seed **`QuotesCache.txt`** so the skin works immediately offline / before the first successful refresh
-- Background re-fetch only when the cache is empty or older than `CacheTtl` (default 45 min), gated by `MinApiInterval` (default 10s)
-- **Favorite rate** — inject a saved quote every *N* rotations (`1` = always favorites, `0` = cache only)
-- Cleans API noise (HTML entities, line breaks, wrapping issues)
+Smart Quotes needs **Rainmeter 4.5 or newer**. Download it from either place — they are the same installer:
 
-### Favorites library
-- Heart icon saves or removes the current quote
-- Gold star when the on-screen quote is already saved
-- Search, scroll, and delete entries in the settings menu
-- Optional direct edit of `Favorites.txt` in Notepad
+- **Official site:** [rainmeter.net](https://www.rainmeter.net/) → **Download**
+- **GitHub:** [rainmeter/rainmeter releases](https://github.com/rainmeter/rainmeter/releases/latest) → download the `Rainmeter-x.x.x.exe` file under **Assets**
 
-### Custom quotes & research
-- **+** opens a quote + author form
-- Globe control searches Google for quotes by author/topic
-- Sample favorites ship with the skin so the library is never empty on first run
+Run the installer and pick **Standard installation**. If you get stuck, Rainmeter's own guide walks through it step by step: [Installing Rainmeter](https://docs.rainmeter.net/manual/installing-rainmeter/).
 
-### Look & feel
-- Dynamic scale controls (clamped ~0.4–1.6)
-- Refresh interval in minutes, edited in-place
-- Menu open/closed state persists across refreshes
-- **Double-click** the quote (or author / background) for the next line — single-click does nothing
-- Hover hit targets on heart, gear, zoom, and list actions
+### 2. Install Smart Quotes
 
-## Requirements
+1. Go to the [latest release](https://github.com/Stelliro/Rainmeter-Smart-Quotes/releases/latest) and download **`Smart-Quotes_1.3.0.rmskin`**.
+2. Double-click the file. Rainmeter's installer opens.
+3. Click **Install**. The widget appears on your desktop straight away.
 
-- Windows
-- [Rainmeter](https://www.rainmeter.net/) 4.5 or newer (InputText plugin is built-in)
-- Network access optional (for cache refresh and web search); local cache + favorites work offline
+That's it. Drag the widget wherever you like.
 
-## Installation
+<details>
+<summary><b>Manual install (zip or git clone)</b></summary>
 
-1. Install [Rainmeter](https://www.rainmeter.net/) if you have not already.
-2. Download the latest **Release** ZIP (or clone this repository).
-3. Copy the `Smart-Quotes` folder into your skins directory, typically:
+1. Download **`Smart-Quotes_1.3.0.zip`** from the [latest release](https://github.com/Stelliro/Rainmeter-Smart-Quotes/releases/latest), or clone this repository.
+2. Put the `Smart-Quotes` folder in your Rainmeter skins folder, usually:
 
    `Documents\Rainmeter\Skins\Smart-Quotes\`
 
-4. In Rainmeter **Manage** → **Skins** → **Smart-Quotes** → load **`SmartQuotes.ini`**.
+3. Right-click the Rainmeter icon in the system tray → **Refresh all**.
+4. Open **Manage** → **Skins** → **Smart-Quotes** → select **`SmartQuotes.ini`** → **Load**.
 
-> The active skin file is **`SmartQuotes.ini`** (not the legacy `StaticQuote.ini` name).
+More help: [Installing skins](https://docs.rainmeter.net/manual/installing-skins/) in the Rainmeter manual.
+</details>
 
-## Controls
+### Updating
+
+Download the new `.rmskin` and install it over the old one. The package includes a sample `Favorites.txt`, so **copy your own `Favorites.txt` somewhere safe first** and put it back after installing. (If you leave **Backup** ticked in the installer, your old folder is also saved to `Documents\Rainmeter\Skins\@Backup\`.)
+
+## How to use it
 
 | Action | What it does |
-|--------|----------------|
-| **Heart** | Toggle favorite for the current quote |
-| **Gear** | Open settings & library |
-| **Double-click quote / author / background** | Show the next quote from the local cache (or favorites per recycle rate) |
-| **Refresh (min)** | Set auto-rotate interval (minutes) |
-| **Favorite rate** | `1` = always favorites; `N` = favorite every *N*th rotation; `0` = cache only |
-| **Scale − / +** | Resize the whole UI (about 0.4–1.6) |
-| **Search bar** | Filter the favorites list |
-| **Globe** | Type an author/topic → Google “quotes by …” |
-| **+** | Add a custom quote and author |
+|--------|--------------|
+| **Double-click** the quote | Show the next quote |
+| **Heart** | Save or remove the current quote (gold star = already saved) |
+| **Gear** | Open settings and your favorites library |
+| **+** | Add your own quote and author |
+| **Globe** | Search Google for quotes by an author or topic |
+| **Search bar** | Filter your favorites |
 | **✕** on a row | Delete that favorite |
-| **Edit .txt File** | Open `Favorites.txt` in Notepad |
-| **Scroll wheel** (over menu) | Scroll the favorites list |
+| **Scroll wheel** (over the menu) | Scroll the favorites list |
+| **Scale − / +** | Make the whole widget bigger or smaller |
+| **Refresh (min)** | How often it changes quote by itself |
+| **Favorite rate** | `1` = only show favorites; `N` = a favorite every *N*th quote; `0` = never |
+| **Edit .txt File** | Open your favorites in Notepad |
 
-## Files
+## Features
 
-| File | Role |
-|------|------|
-| `SmartQuotes.ini` | Skin layout, measures, UI |
-| `logic.lua` | Cache, favorites, WebParser, menu logic |
-| `QuotesCache.txt` | Local pool of online quotes (~50); refreshed in the background |
-| `Favorites.txt` | Your saved quotes (one `"quote" - Author` per line) |
-| `Screenshots/` | README gallery images |
-| `LICENSE` | CC BY-NC-SA 3.0 |
+- **Works offline.** Ships with ~50 quotes in `QuotesCache.txt`, so it works the moment you load it, even with no internet.
+- **Gentle on the quote service.** Fetches quotes from [ZenQuotes](https://zenquotes.io/) in batches of ~50, then rotates locally. It only asks for more when the batch runs out or is over 45 minutes old, and never more than once every 10 seconds, well inside ZenQuotes' free limit of 5 requests per 30 seconds.
+- **Favorites library.** Save, search, scroll and delete quotes, or edit `Favorites.txt` directly. Sample favorites are included so the library is never empty.
+- **Your own quotes.** Add any quote and author from the **+** form.
+- **Scales cleanly.** Resize from about 0.4× to 1.6×; settings and menu state survive refreshes.
+- **Tidy text.** Cleans up HTML entities, stray line breaks and wrapping from the API.
 
-Runtime-only (not required to ship): `debug.log` when diagnosing fetches (`DebugMode=1`).
+## Settings
 
-## Favorites / cache format
+Most people never need these, but they live under `[Variables]` in `SmartQuotes.ini`:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `Scale` | `0.8` | Widget size |
+| `CurrentTimer` | `900` | Seconds between automatic quote changes (15 min) |
+| `RecycleFrequency` | `16` | Show a favorite every N quotes (`0` = never) |
+| `URL` | `https://zenquotes.io/api/quotes` | Batch quote API |
+| `MinApiInterval` | `10` | Minimum seconds between API calls |
+| `CacheTtl` | `2700` | Seconds before a batch is considered stale (45 min) |
+| `DebugMode` | `0` | `1` = write fetch details to `debug.log` and Rainmeter's log |
+
+### Favorites file format
+
+One quote per line: the quote in straight double quotes, then ` - `, then the author. The **last** ` - ` on the line is the separator, so quotes can contain hyphens.
 
 ```text
 "Be the change that you want to see in the world." - Mahatma Gandhi
 "Good judgment comes from experience, and experience comes from bad judgment." - Rita Mae Brown
 ```
 
-Use a straight double-quoted quote, then ` - ` (space-hyphen-space), then the author. The **last** ` - ` on the line is the separator so quote text may contain hyphens.
+## Files
 
-## Configuration notes
-
-Defaults live under `[Variables]` in `SmartQuotes.ini`:
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `Scale` | `0.8` | UI scale factor |
-| `CurrentTimer` | `900` | Auto-rotate interval in **seconds** (15 min); uses local cache |
-| `RecycleFrequency` | `16` | Show a favorite every N rotations (`0` = cache only) |
-| `URL` | `https://zenquotes.io/api/quotes` | Batch API (preferred over `/api/random`) |
-| `MinApiInterval` | `10` | Min seconds between API calls (stay under 5 / 30s) |
-| `CacheTtl` | `2700` | Seconds before a batch may re-fetch (45 min) |
-| `DebugMode` | `0` | `1` = log fetch details to Rainmeter About → Log and `debug.log` |
-
-### ZenQuotes free-tier policy (built-in)
-
-Per [ZenQuotes docs](https://docs.zenquotes.io/zenquotes-documentation/#use-limits):
-
-- **5 requests / 30 seconds / IP** without an API key  
-- Prefer caching `/api/quotes` over calling `/api/random` repeatedly  
-- Attribution required for free use — see Credits below  
-
-This skin stays under that budget by rotating from `QuotesCache.txt` and only refreshing the batch when empty or past `CacheTtl`.
+| File | Role |
+|------|------|
+| `SmartQuotes.ini` | The skin: layout, measures and UI |
+| `logic.lua` | Cache, favorites, fetching and menu logic |
+| `QuotesCache.txt` | Local pool of quotes, refreshed in the background |
+| `Favorites.txt` | Your saved quotes |
+| `Screenshots/` | Images for this README |
+| `LICENSE` | CC BY-NC-SA 3.0 |
 
 ## Credits
 
 - **Original concept:** [Static Quotes](https://github.com/alestrunda/static-quotes) by [alestrunda](https://github.com/alestrunda)
-- **Quotes API:** [ZenQuotes.io](https://zenquotes.io/) — inspirational quotes provided by [ZenQuotes API](https://zenquotes.io/)
+- **Quotes:** inspirational quotes provided by the [ZenQuotes API](https://zenquotes.io/) (attribution required for free use)
 - **Maintainer:** [Stelliro](https://github.com/Stelliro)
 
 ## License
 
-[Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)](https://creativecommons.org/licenses/by-nc-sa/3.0/)
-
-You may share and adapt the work with attribution, for non-commercial use, under the same license. See [LICENSE](LICENSE) for the full legal text.
+[Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)](https://creativecommons.org/licenses/by-nc-sa/3.0/). You may share and adapt it with attribution, for non-commercial use, under the same license. See [LICENSE](LICENSE) for the full text.
 
 ## Changelog
+
+### 1.3.0
+- One-click install: releases now include a `.rmskin` package alongside the zip
+- README rewritten around a simple install, with links to get Rainmeter from rainmeter.net or GitHub
 
 ### 1.2.1
 - Fixed author split (first letter no longer dropped, e.g. Stelliro)
 - Prefer online cache over favorites; favorites only on recycle cadence
 - Seed `QuotesCache.txt` (~50 quotes) for instant offline rotation
 - Hardened WebParser batch fetch (less hang / rate-limit thrash)
-- README, description, and topics refresh for cache + rate-limit model
 
 ### 1.2.0
 - ZenQuotes free-tier safe: batch `/api/quotes` + local `QuotesCache.txt` instead of `/api/random` per change
 - Rate gate (`MinApiInterval`, default 10s) and cache TTL (`CacheTtl`, default 45 min)
 - Double-click rotates instantly from cache; never stuck on "Fetching..."
-- Respects documented limit of **5 requests / 30 seconds** per IP
 
 ### 1.1.0
 - Renamed skin entrypoint to `SmartQuotes.ini`
 - Restored add-quote panel, web-search globe, and favorites list wiring after redesign
 - Fixed numeric InputText anchors, heart favorite tint, timer minutes display, scale clamping
 - Removed unused legacy `changeQuote.lua`
-- README, metadata, topics, and release packaging refresh
